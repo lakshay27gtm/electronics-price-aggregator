@@ -13,35 +13,31 @@ st.write("Compare prices across Amazon, Flipkart, Croma & Reliance Digital")
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
-    amazon1 = pd.read_csv("amazon1.csv", encoding="latin-1", engine="python")
-    amazon2 = pd.read_csv("amazon2.csv", encoding="latin-1", engine="python")
 
-    # 🚨 FIX: BAD CSV HANDLING
-    croma = pd.read_csv(
-        "croma.csv",
-        encoding="latin-1",
-        engine="python",
-        on_bad_lines="skip"
-    )
+    def safe_read(file):
+        return pd.read_csv(
+            file,
+            encoding="latin-1",
+            engine="python",
+            on_bad_lines="skip"
+        )
 
-    flipkart_mobile = pd.read_csv("flipkart_mobile_data.csv", encoding="latin-1", engine="python")
-    flipkart_laptops = pd.read_csv("flipkart_laptops.csv", encoding="latin-1", engine="python")
-    flipkart_earphones = pd.read_csv("flipkart_earphones.csv", encoding="latin-1", engine="python")
+    amazon1 = safe_read("amazon1.csv")
+    amazon2 = safe_read("amazon2.csv")
+    croma = safe_read("croma.csv")
+    flipkart_mobile = safe_read("flipkart_mobile_data.csv")
+    flipkart_laptops = safe_read("flipkart_laptops.csv")
+    flipkart_earphones = safe_read("flipkart_earphones.csv")
+    reliance = safe_read("Reliance Digital India Product Dataset.csv")
 
-    reliance = pd.read_csv(
-        "Reliance Digital India Product Dataset.csv",
-        encoding="latin-1",
-        engine="python",
-        on_bad_lines="skip"
-    )
+    # -------- SAFE CLEAN FUNCTION --------
+    def clean(df, col_map, category, source):
+        df = df.rename(columns=col_map)
 
-    # -------- STANDARDIZE FUNCTION --------
-    def clean(df, p, pr, b, category, source):
-        df = df.rename(columns={
-            p: "product_name",
-            pr: "price",
-            b: "brand"
-        })
+        # Ensure required columns always exist
+        for col in ["product_name", "price", "brand"]:
+            if col not in df.columns:
+                df[col] = pd.NA
 
         df["category"] = category
         df["source"] = source
@@ -49,13 +45,13 @@ def load_data():
         return df[["product_name", "brand", "category", "price", "source"]]
 
     frames = [
-        clean(amazon1, "Product Name", "Price", "Brand", "Electronics", "Amazon"),
-        clean(amazon2, "Product Name", "Price", "Brand", "Electronics", "Amazon"),
-        clean(flipkart_mobile, "Product", "Selling Price", "Brand", "Mobile", "Flipkart"),
-        clean(flipkart_laptops, "Product", "Selling Price", "Brand", "Laptop", "Flipkart"),
-        clean(flipkart_earphones, "Product", "Selling Price", "Brand", "Earphones", "Flipkart"),
-        clean(croma, "Product Name", "Price", "Brand", "Electronics", "Croma"),
-        clean(reliance, "Product Name", "Price", "Brand", "Electronics", "Reliance Digital")
+        clean(amazon1, {"Product Name": "product_name", "Price": "price", "Brand": "brand"}, "Electronics", "Amazon"),
+        clean(amazon2, {"Product Name": "product_name", "Price": "price", "Brand": "brand"}, "Electronics", "Amazon"),
+        clean(flipkart_mobile, {"Product": "product_name", "Selling Price": "price", "Brand": "brand"}, "Mobile", "Flipkart"),
+        clean(flipkart_laptops, {"Product": "product_name", "Selling Price": "price", "Brand": "brand"}, "Laptop", "Flipkart"),
+        clean(flipkart_earphones, {"Product": "product_name", "Selling Price": "price", "Brand": "brand"}, "Earphones", "Flipkart"),
+        clean(croma, {"Product Name": "product_name", "Price": "price", "Brand": "brand"}, "Electronics", "Croma"),
+        clean(reliance, {"Product Name": "product_name", "Price": "price", "Brand": "brand"}, "Electronics", "Reliance Digital"),
     ]
 
     df = pd.concat(frames, ignore_index=True)
@@ -67,13 +63,12 @@ def load_data():
         .str.replace("₹", "", regex=False)
         .str.replace(",", "", regex=False)
     )
-
     df["price"] = pd.to_numeric(df["price"], errors="coerce")
 
     # -------- CLEAN PRODUCT NAME --------
     df["product_name"] = df["product_name"].astype(str).str.lower().str.strip()
 
-    return df.dropna(subset=["price", "product_name"])
+    return df.dropna(subset=["product_name", "price"])
 
 data = load_data()
 
@@ -90,7 +85,7 @@ brand = st.sidebar.selectbox(
     ["All"] + sorted(data["brand"].dropna().unique().tolist())
 )
 
-# ---------------- APPLY FILTERS ----------------
+# ---------------- FILTER DATA ----------------
 filtered = data.copy()
 
 if category != "All":
@@ -112,7 +107,7 @@ if search:
         comparison["product_name"].str.contains(search.lower(), na=False)
     ]
 
-# ---------------- DISPLAY TABLE ----------------
+# ---------------- DISPLAY ----------------
 st.subheader("💰 Best Price Available")
 
 st.dataframe(
@@ -139,6 +134,3 @@ if not comparison.empty:
 else:
     col2.metric("Lowest Price (₹)", "N/A")
     col3.metric("Highest Price (₹)", "N/A")
-
-
-      
