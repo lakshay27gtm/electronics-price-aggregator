@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Electronics Price Aggregator", layout="wide")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(
+    page_title="Electronics Price Aggregator",
+    layout="wide"
+)
 
 st.title("🔍 Electronics Price Aggregator")
 st.write("Compare prices across Amazon, Flipkart, Croma & Reliance Digital")
@@ -9,48 +13,54 @@ st.write("Compare prices across Amazon, Flipkart, Croma & Reliance Digital")
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
-    amazon1 = pd.read_csv("amazon1.csv")
-    amazon2 = pd.read_csv("amazon2.csv")
-    croma = pd.read_csv("croma.csv")
-    flipkart_mobile = pd.read_csv("flipkart_mobile_data.csv")
-    flipkart_laptops = pd.read_csv("flipkart_laptops.csv")
-    flipkart_earphones = pd.read_csv("flipkart_earphones.csv")
-    reliance = pd.read_csv("Reliance Digital India Product Dataset.csv")
+    amazon1 = pd.read_csv("amazon1.csv", encoding="latin-1")
+    amazon2 = pd.read_csv("amazon2.csv", encoding="latin-1")
+    croma = pd.read_csv("croma.csv", encoding="latin-1")
+    flipkart_mobile = pd.read_csv("flipkart_mobile_data.csv", encoding="latin-1")
+    flipkart_laptops = pd.read_csv("flipkart_laptops.csv", encoding="latin-1")
+    flipkart_earphones = pd.read_csv("flipkart_earphones.csv", encoding="latin-1")
+    reliance = pd.read_csv(
+        "Reliance Digital India Product Dataset.csv",
+        encoding="latin-1"
+    )
 
-    # ---------- STANDARDIZE ----------
-    def clean(df, col_mapping, category, source):
-        df_cleaned = df.rename(columns=col_mapping)
+    # -------- STANDARDIZE FUNCTION --------
+    def clean(df, p, pr, b, category, source):
+        df = df.rename(columns={
+            p: "product_name",
+            pr: "price",
+            b: "brand"
+        })
 
-        # Ensure required columns are present, adding as pd.NA if missing
-        for col in ["product_name", "price", "brand"]:
-            if col not in df_cleaned.columns:
-                df_cleaned[col] = pd.NA
+        df["category"] = category
+        df["source"] = source
 
-        df_cleaned["category"] = category
-        df_cleaned["source"] = source
-        return df_cleaned[["product_name", "brand", "category", "price", "source"]]
+        return df[["product_name", "brand", "category", "price", "source"]]
 
     frames = [
-        clean(amazon1, {"name": "product_name", "actual_price": "price"}, "Electronics", "Amazon"),
-        clean(amazon2, {"name": "product_name", "actual_price": "price"}, "Electronics", "Amazon"),
-        clean(flipkart_mobile, {"Title": "product_name", "Price": "price"}, "Mobile", "Flipkart"),
-        clean(flipkart_laptops, {"Title": "product_name", "Price": "price"}, "Laptop", "Flipkart"),
-        clean(flipkart_earphones, {"Title": "product_name", "Price": "price"}, "Earphones", "Flipkart"),
-        clean(croma, {"name": "product_name", "price": "price"}, "Electronics", "Croma"),
-        clean(reliance, {"Product Name": "product_name", "Price (₹)": "price", "Brand": "brand"}, "Electronics", "Reliance Digital")
+        clean(amazon1, "Product Name", "Price", "Brand", "Electronics", "Amazon"),
+        clean(amazon2, "Product Name", "Price", "Brand", "Electronics", "Amazon"),
+        clean(flipkart_mobile, "Product", "Selling Price", "Brand", "Mobile", "Flipkart"),
+        clean(flipkart_laptops, "Product", "Selling Price", "Brand", "Laptop", "Flipkart"),
+        clean(flipkart_earphones, "Product", "Selling Price", "Brand", "Earphones", "Flipkart"),
+        clean(croma, "Product Name", "Price", "Brand", "Electronics", "Croma"),
+        clean(reliance, "Product Name", "Price", "Brand", "Electronics", "Reliance Digital")
     ]
 
     df = pd.concat(frames, ignore_index=True)
 
-    # ---------- CLEAN ----------
+    # -------- CLEAN PRICE --------
     df["price"] = (
-        df["price"].astype(str)
+        df["price"]
+        .astype(str)
         .str.replace("₹", "", regex=False)
         .str.replace(",", "", regex=False)
     )
+
     df["price"] = pd.to_numeric(df["price"], errors="coerce")
 
-    df["product_name"] = df["product_name"].str.lower().str.strip()
+    # -------- CLEAN PRODUCT NAME --------
+    df["product_name"] = df["product_name"].astype(str).str.lower().str.strip()
 
     return df.dropna(subset=["price", "product_name"])
 
@@ -69,7 +79,7 @@ brand = st.sidebar.selectbox(
     ["All"] + sorted(data["brand"].dropna().unique().tolist())
 )
 
-# ---------------- FILTER DATA ----------------
+# ---------------- APPLY FILTERS ----------------
 filtered = data.copy()
 
 if category != "All":
@@ -88,10 +98,10 @@ search = st.text_input("🔎 Search Product")
 
 if search:
     comparison = comparison[
-        comparison["product_name"].str.contains(search.lower())
+        comparison["product_name"].str.contains(search.lower(), na=False)
     ]
 
-# ---------------- DISPLAY ----------------
+# ---------------- DISPLAY TABLE ----------------
 st.subheader("💰 Best Price Available")
 
 st.dataframe(
@@ -110,5 +120,12 @@ st.subheader("📊 Platform Overview")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Products", len(comparison))
-col2.metric("Lowest Price (₹)", int(comparison["price"].min()))
-col3.metric("Highest Price (₹)", int(comparison["price"].max()))
+
+if not comparison.empty:
+    col2.metric("Lowest Price (₹)", int(comparison["price"].min()))
+    col3.metric("Highest Price (₹)", int(comparison["price"].max()))
+else:
+    col2.metric("Lowest Price (₹)", "N/A")
+    col3.metric("Highest Price (₹)", "N/A")
+
+      
