@@ -13,15 +13,26 @@ st.write("Compare prices across Amazon, Flipkart, Croma & Reliance Digital")
 # ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
-    amazon1 = pd.read_csv("amazon1.csv", encoding="latin-1")
-    amazon2 = pd.read_csv("amazon2.csv", encoding="latin-1")
-    croma = pd.read_csv("croma.csv", encoding="latin-1")
-    flipkart_mobile = pd.read_csv("flipkart_mobile_data.csv", encoding="latin-1")
-    flipkart_laptops = pd.read_csv("flipkart_laptops.csv", encoding="latin-1")
-    flipkart_earphones = pd.read_csv("flipkart_earphones.csv", encoding="latin-1")
+    amazon1 = pd.read_csv("amazon1.csv", encoding="latin-1", engine="python")
+    amazon2 = pd.read_csv("amazon2.csv", encoding="latin-1", engine="python")
+
+    # 🚨 FIX: BAD CSV HANDLING
+    croma = pd.read_csv(
+        "croma.csv",
+        encoding="latin-1",
+        engine="python",
+        on_bad_lines="skip"
+    )
+
+    flipkart_mobile = pd.read_csv("flipkart_mobile_data.csv", encoding="latin-1", engine="python")
+    flipkart_laptops = pd.read_csv("flipkart_laptops.csv", encoding="latin-1", engine="python")
+    flipkart_earphones = pd.read_csv("flipkart_earphones.csv", encoding="latin-1", engine="python")
+
     reliance = pd.read_csv(
         "Reliance Digital India Product Dataset.csv",
-        encoding="latin-1"
+        encoding="latin-1",
+        engine="python",
+        on_bad_lines="skip"
     )
 
     # -------- STANDARDIZE FUNCTION --------
@@ -119,6 +130,7 @@ st.dataframe(
 st.subheader("📊 Platform Overview")
 
 col1, col2, col3 = st.columns(3)
+
 col1.metric("Total Products", len(comparison))
 
 if not comparison.empty:
@@ -127,5 +139,6 @@ if not comparison.empty:
 else:
     col2.metric("Lowest Price (₹)", "N/A")
     col3.metric("Highest Price (₹)", "N/A")
+
 
       
